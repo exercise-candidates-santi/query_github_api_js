@@ -65,6 +65,7 @@
         current: 0,
         last: 0,
         items: [],
+        currentItems: [],
         xRateLimit: 0,
         xRateLimitRemain:0,
         xRateLimitReset: 0,
@@ -74,7 +75,7 @@
             //We get position of search in the pagination of github through the link header
             if(ev.xhr){
                 var st = ev.xhr.getResponseHeader("link"),
-                    re = /\<(https.+)\>.+(rel=\"next\").+\<(https.+)\>.+(rel=\"last\")/g,
+                    re = /\<(https.+)\>.+(rel=["\']next["\']).+\<(https.+)\>.+(rel=["\']last["\'])/g,
                     res = re.exec(st), splitTmp;
                 if(res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
                     splitTmp = res[1].split("page=");
@@ -85,22 +86,21 @@
                 }                
                 this.xRateLimit = ev.xhr.getResponseHeader("X-RateLimit-Limit");
                 this.xRateLimitRemain = ev.xhr.getResponseHeader("X-RateLimit-Remaining");
-                this.xRateLimitReset = ev.xhr.getResponseHeader("X-RateLimit-Reset");
+                this.xRateLimitReset = parseInt(ev.xhr.getResponseHeader("X-RateLimit-Reset"), 10) * 1000;
                 this.headers = ev.xhr.getAllResponseHeaders();
             }
             if(ev.response){
-                this.items = ev.response.items || [];
+                this.currentItems = ev.response.items || [];
                 this.total = ev.response.total_count;
             }
-            
+            window.resett = this.xRateLimitReset;
         },
         toRepositoryArray: function(repos_){
             var repositories = [],
                 repos,
                 i = 0;
             if( !$.isArray(repos_) ){
-                //console.log(repos_, "not an array");
-                repos = this.items;
+                repos = this.currentItems;
             }
             for (; i<repos.length; i++){
                 repositories.push( new GithubRepo.Repository(repos[i]) );
@@ -108,26 +108,52 @@
             return repositories;
         }
     }
+    /**
+     * We just save the properties we need to save memory
+     * @param {Object} ob object with all the properties we can get from the github api
+     */
     GithubRepo.Repository = function(ob){
         if( !ob || typeof ob !== "object" ) return;
         var default_ = "value not present";        
         this.name = ob.name || default_;
-        this.fullName = ob.full_name || default_;        
-        this.owner = ob.owner && ob.owner.name ? ob.owner.name : default_;
-        this.language = ob.language || default_;
-        this.description = ob.description || default_;
-        this.url = ob.url || default_;
+        this.owner = ob.owner && ob.owner.login ? ob.owner.login : default_;
+        this.properties = {
+            full_name: ob.full_name || default_,
+            language: ob.language || default_,
+            description: ob.description || default_,
+            url: ob.url || default_,
+            followers: ob.owner && ob.owner.followers_url ? ob.owner.followers_url : default_
+        }
+
     }
     
     GithubRepo.Repository.prototype = {
-        toString: function(){
-            var st = "";
-            for (var p in this){
-                if( this.hasOwnProperty(p) ){
-                    //st
-                }
-            }
-        }
+        renderProperties: function(){
+            var props = this.properties,
+                ul = $("<ul />"), 
+                li, fixProp;
+          for(var prop in props){
+              if( props.hasOwnProperty(prop) ){
+                  fixProp = prop.replace("_", " ");
+                  li = $("<li><span>"+fixProp+": </span>" + "<span>"+props[prop]+"</span></li>");
+                  ul.append(li);
+              }
+          }
+          return ul;
+        },
+        render: function(){
+            var container = $("<div />"),
+                name = $("<div><span>"+this.owner+": </span>" + "<span>"+this.name+"</span></div>"),
+                list = this.renderProperties();
+            container.append(name);
+            container.append(list);
+            list.hide();
+            name.on("click", function(){
+                list.toggle();
+            });
+            
+            return container;            
+        }        
     }
     /**
      * Quick paginator to show results.
@@ -135,46 +161,82 @@
      */
     var Paginator = {
         container: null,
+        div: null,
+        ul: null,
         items: null,
-        numItemsPage: null,
-        pages: 0        
-    }
-    /*function Paginator(container, items, numItemsPage, parser){
-        if( !(this instanceof Paginator) ){
-            return new Paginator(container, items, numItemsPage);
-        }
-        
-        this.container = (function(el){
-                var element;
-                if( typeof el === "string" ){
-                    element = $("#"+el);
-                }else if( typeof el === "object" ){
-                    element = $(element);
-                }
-                if( !element || !element.length ){
-                    throw new Error("Paginator: The first argument must be an existing ID or a DOM element");
-                }
-                return element;
-            })(container);
-        
-        
-        this.num = numItemsPage || 10;
-        this.pages = [];
-        this.parseItems(items, parser);
-        console.log(this);
-    }
-    Paginator.prototype = {
-        parseItems: function(items, parser){
-            if( $.isPlainObject(items) ){
-                if( $.isFunction(parser) ){
-                    parser.call(this, items);
+        numItemsPage: 30,
+        class: 'paginated',
+        pages: 0,
+        renderer: function(item){
+            var st = "";
+            for (var ob in item){
+                st += "<div>"+ob+": " +item[ob]+"</div>";
+            }
+            return $("<div>"+st+"</div>");
+        },
+        //We use ducktyping to check if items have a method to draw themselves.
+        render: function(items){
+            var tmpLi;
+            if( !$.isArray(items) ) {
+                if($.isArray(this.items)){
+                    var items = this.items;
                 }else{
-                    this.listItems = $.isArray(items.items) ? items.items : [];
-                }                
-                this.totalItems = items.total_count || 0;
+                    return;
+                }
+                
+            }
+            if(!this.div || !this.ul) {
+                this.paginate();
             }            
+           
+            try{                
+                for(var i=0; i<items.length; i++){
+                    if(items[i]){                        
+                        tmpLi = this.toLiNode(items[i]);
+                        if(tmpLi){
+                            this.ul.append(tmpLi);
+                        }
+                        
+                    }
+                }
+            }catch(e){
+               
+                throw Error("Could not render items. ",e.message);
+            }
+
+        },
+        paginate: function(){
+            var div, ul;
+            if(!this.container) {
+                this.container = $("<div />");
+                $("body").append(this.container);
+            }
+            this.container.empty();
+            div = $("<div>").attr("class", this.class),
+            ul = $("<ul>");
+            div.append(ul);
+            this.container.append(div);
+            this.div = div;
+            this.ul = ul;
+        },
+        toLiNode: function(item){
+            var li = $("<li />"), node;
+            //if item doesn't have a way to be rendered:
+            
+            if( typeof item.render !== "function" ){
+                node = this.renderer(item);
+            }else{
+                node = item.render();
+            }
+            if( typeof node === "string" || node instanceof jQuery || node.nodeType){
+                li.append(node);
+            }
+            
+            
+            return li.children().length ? li : "";
         }
-    }*/
+        
+    }
     
     function ApiSearcher(url, defaultSuccessCb, defaultErrorCb){
         if( !(this instanceof ApiSearcher) ){
@@ -234,7 +296,10 @@
              GithubRepo.parseResponse(ev);
              Paginator.container = $("#results");
              Paginator.items = GithubRepo.toRepositoryArray();
-             console.log(Paginator);
+             Paginator.numItemsPage = GithubRepo.currentItems.length;
+             Paginator.totalPages = Math.ceil(GithubRepo.total/Paginator.numItemsPage);
+             Paginator.paginate();
+             Paginator.render();
          });
          $("#search").on("keyup", function (e) {                
             if (e.keyCode == 13) {
