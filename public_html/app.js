@@ -60,17 +60,66 @@
         API_URL = "https://api.github.com/search/repositories",
         total = 1;
     
-    function GithubRepo(ob){
+    var GithubRepo = {
+        headers: null,
+        current: 0,
+        last: 0,
+        items: [],
+        xRateLimit: 0,
+        xRateLimitRemain:0,
+        xRateLimitReset: 0,
+        total: 0,
+        parseResponse: function(ev){
+            if(!ev) return;
+            //We get position of search in the pagination of github through the link header
+            if(ev.xhr){
+                var st = ev.xhr.getResponseHeader("link"),
+                    re = /\<(https.+)\>.+(rel=\"next\").+\<(https.+)\>.+(rel=\"last\")/g,
+                    res = re.exec(st), splitTmp;
+                if(res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
+                    splitTmp = res[1].split("page=");
+                    this.url = splitTmp[0];
+                    this.current = parseInt(splitTmp[1], 10) - 1;
+                    splitTmp = res[3].split("page=");
+                    this.last = parseInt(splitTmp[1], 10);
+                }                
+                this.xRateLimit = ev.xhr.getResponseHeader("X-RateLimit-Limit");
+                this.xRateLimitRemain = ev.xhr.getResponseHeader("X-RateLimit-Remaining");
+                this.xRateLimitReset = ev.xhr.getResponseHeader("X-RateLimit-Reset");
+                this.headers = ev.xhr.getAllResponseHeaders();
+            }
+            if(ev.response){
+                this.items = ev.response.items || [];
+                this.total = ev.response.total_count;
+            }
+            
+        },
+        toRepositoryArray: function(repos_){
+            var repositories = [],
+                repos,
+                i = 0;
+            if( !$.isArray(repos_) ){
+                //console.log(repos_, "not an array");
+                repos = this.items;
+            }
+            for (; i<repos.length; i++){
+                repositories.push( new GithubRepo.Repository(repos[i]) );
+            }
+            return repositories;
+        }
+    }
+    GithubRepo.Repository = function(ob){
         if( !ob || typeof ob !== "object" ) return;
         var default_ = "value not present";        
         this.name = ob.name || default_;
         this.fullName = ob.full_name || default_;        
         this.owner = ob.owner && ob.owner.name ? ob.owner.name : default_;
         this.language = ob.language || default_;
-        this.description = ob.description;
+        this.description = ob.description || default_;
         this.url = ob.url || default_;
     }
-    GithubRepo.prototype = {
+    
+    GithubRepo.Repository.prototype = {
         toString: function(){
             var st = "";
             for (var p in this){
@@ -182,10 +231,10 @@
     $(document).ready(function () {
         var apisearcher = ApiSearcher(API_URL);
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
-             //var paginate = Paginator("results", ev.response );
+             GithubRepo.parseResponse(ev);
              Paginator.container = $("#results");
-             Paginator.items = ev.response.items;
-             console.log(ev);
+             Paginator.items = GithubRepo.toRepositoryArray();
+             console.log(Paginator);
          });
          $("#search").on("keyup", function (e) {                
             if (e.keyCode == 13) {
