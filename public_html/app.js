@@ -59,70 +59,72 @@
         noop = function(){},
         API_URL = "https://api.github.com/search/repositories",
         total = 1;
+    
+    function GithubRepo(ob){
+        if( !ob || typeof ob !== "object" ) return;
+        var default_ = "value not present";        
+        this.name = ob.name || default_;
+        this.fullName = ob.full_name || default_;        
+        this.owner = ob.owner && ob.owner.name ? ob.owner.name : default_;
+        this.language = ob.language || default_;
+        this.description = ob.description;
+        this.url = ob.url || default_;
+    }
+    GithubRepo.prototype = {
+        toString: function(){
+            var st = "";
+            for (var p in this){
+                if( this.hasOwnProperty(p) ){
+                    //st
+                }
+            }
+        }
+    }
     /**
-     * Simple plugin to search an api and show the results in a list
-     * @param {Object} initOptions basic configuration options
-     * @param {String} initOptions.api api url
-     * @param {Object} initOptions.resultsContainer either a dom object or its id as a string, this reference the container where results will be displayed.
-     * @param {Function} initOptions.onError error callback that will be executed on an error
-     * @param {Function} initOptions.onSuccess callback that will be executed when we fetch the api results
-     * @returns {app_L57.$.fn}
+     * Quick paginator to show results.
+     * @returns {app_L57.Paginator}
      */
-    /*$.fn.apiSearcher = function (initOptions) {
-        var self = this,
-                wrapper = $("<div>")
-        empty = function () {
-        },
-                settings = $.extend({
-                    // These are the defaults.
-                    color: "#556b2f",
-                    backgroundColor: "white"
-                }, initOptions);
-
-        if (settings.resultsContainer) {
-            var el = document.getElementById(settings.resultsContainer);
-            this.resultsContainer = $(el);
-            if (!this.resultsContainer.length) {
-                var el = $("<div />");
-                el.attr("id", "results" + Math.floor(Math.random() * 100000000));
-                $("body").append(el);
-                this.resultsContainer = el;
-            }
+    var Paginator = {
+        container: null,
+        items: null,
+        numItemsPage: null,
+        pages: 0        
+    }
+    /*function Paginator(container, items, numItemsPage, parser){
+        if( !(this instanceof Paginator) ){
+            return new Paginator(container, items, numItemsPage);
         }
-
-        var toFunction = function (fn) {
-            if (!$.isFunction(fn)) {
-                fn = empty;
-                console.log(fn, "is a not function")
-            } else {
-                console.log(fn, "is a function")
-            }
-            return fn;
+        
+        this.container = (function(el){
+                var element;
+                if( typeof el === "string" ){
+                    element = $("#"+el);
+                }else if( typeof el === "object" ){
+                    element = $(element);
+                }
+                if( !element || !element.length ){
+                    throw new Error("Paginator: The first argument must be an existing ID or a DOM element");
+                }
+                return element;
+            })(container);
+        
+        
+        this.num = numItemsPage || 10;
+        this.pages = [];
+        this.parseItems(items, parser);
+        console.log(this);
+    }
+    Paginator.prototype = {
+        parseItems: function(items, parser){
+            if( $.isPlainObject(items) ){
+                if( $.isFunction(parser) ){
+                    parser.call(this, items);
+                }else{
+                    this.listItems = $.isArray(items.items) ? items.items : [];
+                }                
+                this.totalItems = items.total_count || 0;
+            }            
         }
-
-        var doSearch = function () {
-            var ajaxOptions = {
-                type: "GET",
-                url: settings.api,
-                dataType: "json",
-                data: {q: self.val(), access_token: ACCESS_TOKEN},
-                success: self.toFunction(settings.onSuccess),
-                error: self.toFunction(settings.onError)
-            };
-
-            $.ajax(ajaxOptions);
-        }
-
-        this.wrap(wrapper);
-
-        this.on("keyup", function (e) {
-            if (e.which == 83)
-                console.log(e, e.keyCode);
-            if (e.keyCode == 13) {
-                doSearch();
-            }
-        });
-        return this;
     }*/
     
     function ApiSearcher(url, defaultSuccessCb, defaultErrorCb){
@@ -133,19 +135,20 @@
         this.apiUrl = url;
         this.customSuccess = $.isFunction(defaultSuccessCb) ? defaultSuccessCb : noop;
         this.customError = $.isFunction(defaultErrorCb) ? defaultErrorCb : noop;
+        
     }
     ApiSearcher.ACCESS_TOKEN = "2161f323efe781e7c9c8cb9986abb3c5ccf30cef";
     ApiSearcher.SEARCH = "ON_SEARCH";
     ApiSearcher.ERROR = "ON_ERROR";
     ApiSearcher.prototype = {        
-        defaultSuccess: function(data_, res){
-            this.customSuccess.call(this, data_, res);
-            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, target: this} ); 
+        defaultSuccess: function(data_, res, xhr){
+            this.customSuccess.call(this, data_, res, xhr);
+            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
             $(this).trigger(ev);
         },
-        defaultError: function(data_, res){            
+        defaultError: function(data_, res, xhr){            
             this.customError.call(this, data_, res);
-            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, target: this} ); 
+            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
             this.trigger(ev);
         },
         trigger: function(ev){
@@ -165,56 +168,30 @@
                     url: self.apiUrl,
                     dataType: "json",
                     data: {q: val, access_token: token},
-                    success: function(ev, data){
-                        self.defaultSuccess(ev, data);
+                    success: function(response, res, xhr){
+                        self.defaultSuccess(response, res, xhr);
                     },
-                    error: function(ev, data){
-                        self.defaultError(ev, data);
+                    error: function(response, res, xhr){
+                        self.defaultError(response, res, xhr);
                     }
                 };
             $.ajax(ajaxOptions);
         }
     }
-    var onError = function (data) {
-        console.error("Error: ", data);
-    }
-
-    var onSuccess = function (data) {
-        var resulDiv = $("#resul");
-        
-        //console.log("Success: ", total, data);
-        /*total++;
-        if (total < 20) {
-            var e = $.Event("keyup");
-            e.which = 13; // # Some key code value
-            e.keyCode = 13;
-            setTimeout(function () {
-                $("#search").trigger(e);
-            }, 3000);
-
-        }*/
-    }
 
     $(document).ready(function () {
-        var apisearcher = ApiSearcher(API_URL, onSuccess, onError);
+        var apisearcher = ApiSearcher(API_URL);
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
-             console.log("apisearcher on ", ev.response);
+             //var paginate = Paginator("results", ev.response );
+             Paginator.container = $("#results");
+             Paginator.items = ev.response.items;
+             console.log(ev);
          });
          $("#search").on("keyup", function (e) {                
             if (e.keyCode == 13) {
                 var val= $(this).val();
-                /*setTimeout(function(){
-                    apisearcher.doSearch($(this).val());
-                }, 3000)*/
                 if (total < 20) {
-                    var e = $.Event("keyup");
-                    e.which = 13; // # Some key code value
-                    e.keyCode = 13;
                     apisearcher.doSearch(val);
-                    setTimeout(function () {
-                        $("#search").trigger(e);
-                    }, 3000);
-                    total++;
                 }
             }
         });
