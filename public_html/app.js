@@ -60,12 +60,16 @@
         API_URL = "https://api.github.com/search/repositories",
         total = 1;
     
-    var GithubRepo = {
+    var GithubRepoApi = {
         /**
          * All the response headers
          */
         headers: null,
         
+        /**
+         * url of github Api
+         */ 
+        url: "",
         /**
          * current response page number
          */        
@@ -116,16 +120,20 @@
             if(!ev) return;
             //We get position of search in the pagination of github through the link header
             if(ev.xhr){
+                this.last = 0;
                 var st = ev.xhr.getResponseHeader("link"),
                     re = /\<(https.+)\>.+(rel=["\']next["\']).+\<(https.+)\>.+(rel=["\']last["\'])/g,
                     res = re.exec(st), splitTmp;
-                if(res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
+                //if there are more than 1 page  
+                if(res && res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
                     splitTmp = res[1].split("page=");
                     this.url = splitTmp[0];
                     this.current = parseInt(splitTmp[1], 10) - 1;
                     splitTmp = res[3].split("page=");
                     this.last = parseInt(splitTmp[1], 10);
-                }                
+                }else {
+                    this.current = 1;
+                }             
                 this.xRateLimit = ev.xhr.getResponseHeader("X-RateLimit-Limit");
                 this.xRateLimitRemain = ev.xhr.getResponseHeader("X-RateLimit-Remaining");
                 this.xRateLimitReset = parseInt(ev.xhr.getResponseHeader("X-RateLimit-Reset"), 10) * 1000;
@@ -138,7 +146,7 @@
         },
         
         /**
-         * Utility method to transform a group of repostitories to GithubRepo.Repository instances
+         * Utility method to transform a group of repostitories to GithubRepoApi.Repository instances
          * @param {type} repos_
          * @returns {Array}
          */
@@ -150,7 +158,7 @@
                 repos = this.currentItems;
             }
             for (; i<repos.length; i++){
-                repositories.push( new GithubRepo.Repository(repos[i]) );
+                repositories.push( new GithubRepoApi.Repository(repos[i]) );
             }
             return repositories;
         }
@@ -160,7 +168,7 @@
      * We just save the properties we need to save memory
      * @param {Object} ob object with all the properties we can get from the github api
      */
-    GithubRepo.Repository = function(ob){
+    GithubRepoApi.Repository = function(ob){
         if( !ob || typeof ob !== "object" ) return;
         var default_ = "value not present";        
         this.name = ob.name || default_;
@@ -175,7 +183,7 @@
 
     }
     
-    GithubRepo.Repository.prototype = {
+    GithubRepoApi.Repository.prototype = {
         /**
          * Utility method to create a dom list of properties
          * @returns {Object} jQuery object with a list of properties
@@ -226,8 +234,14 @@
         ul: null,
         items: null,
         numItemsPage: 30,
+        currentPage:0,
+        totalPages: 0,
         class: 'paginated',
+        selected: 'page-selected',
         pages: 0,
+        provider: null,
+        dots: "...",
+        buttons: null,
         
         /**
          * Allows to render any kind of object
@@ -292,6 +306,108 @@
             this.container.append(div);
             this.div = div;
             this.ul = ul;
+            this.createPages();
+        },
+        
+        /**
+         * Adds actions to buttons
+         */
+        addPageActions: function(){
+            var self = this, l;
+            if($.isArray(this.buttons)){
+                l = this.buttons.length;
+                //return;
+                try {
+                    if(this.buttons[0]){
+                        this.buttons[0].on("click", function(){
+                            self.goPrevious();
+                        });
+                    }
+                    if(this.buttons[l-1]){
+                        this.buttons[l-1].on("click", function(){
+                            self.goNext();
+                        });
+                    }
+                    for(var i=1; i<l-1; i++){
+                        if(this.buttons[i] && this.buttons[i].text() !== this.dots){
+                            this.buttons[i].on("click", function(){
+                                self.goToPage();
+                            });
+                        }
+                    }
+                }catch(e){
+                    alert(e);
+                }
+            }
+        },
+        goNext: function(){
+            if(this.currentPage < this.totalPages){
+                this.currentPage++;
+                this.paginate();
+            }
+        },
+        goPrevious: function(){
+            if(this.currentPage > 1){
+                this.currentPage--;
+                this.paginate();
+            }
+        },
+        goToPage: function(){
+            
+        },
+        createPages: function(){
+            if( !this.div instanceof $ ) return;
+            var max = 7,//we only show a maximum of 7 buttons
+                num = max <= this.totalPages ? max : this.totalPages, 
+                container = $("<div>"),
+                current = this.currentPage,
+                last = this.totalPages,
+                dif = last - current,
+                previous = this.currentPage > 1 ? $("<span><<</span>") : "",
+                next = dif > 1 ? $("<span>>></span>") : "",
+                i = 1,
+                dummy = $("<span>"+this.dots+"</span>"),
+                layers = new Array();
+            
+            if(current>1){
+               layers[i-1] = previous;
+               
+            }
+            
+            /*if(current < 5 && last > num){
+                for(; i<=5; i++){
+                    layers[i] =  $("<span>"+i+"</span>");
+                }
+                layers[6] =  dummy;
+                layers[7] =  $("<span>"+last+"</span>");
+            } else if(current >= 5){
+                for(var i=1; i<=num; i++){
+                    layers[i] =  $("<span>"+i+"</span>");
+                }
+                if(current < num){
+                    layers[5] =  $("<span>"+current+"</span>");
+                    i = 6;
+                    while(i<num){
+                       layers[i] =  num;
+                       i++;
+                    }
+                }else if(current > num){
+                    
+                }
+            }*/
+            
+            if(last>current){
+                layers.push(next);
+            }
+            
+            
+            for(i=0; i<layers.length; i++){
+                if(layers[i]) container.append(layers[i]);
+            }
+            this.div.prepend(container);            
+            this.buttons = layers;
+            this.addPageActions();
+            this.buttons[this.currentPage].addClass(this.selected);
         },
         
         /**
@@ -419,11 +535,12 @@
          });
          
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
-             GithubRepo.parseResponse(ev);
+             GithubRepoApi.parseResponse(ev);
              Paginator.container = resulDiv;
-             Paginator.items = GithubRepo.toRepositoryArray();
-             Paginator.numItemsPage = GithubRepo.currentItems.length;
-             Paginator.totalPages = Math.ceil(GithubRepo.total/Paginator.numItemsPage);
+             Paginator.items = GithubRepoApi.toRepositoryArray();
+             Paginator.currentPage = GithubRepoApi.current;
+             Paginator.totalPages = GithubRepoApi.last;
+
              Paginator.paginate();
              Paginator.render();
          });

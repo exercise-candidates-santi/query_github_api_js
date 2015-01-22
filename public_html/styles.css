@@ -1,0 +1,52 @@
+* {
+  margin: 0;
+  padding: 0; }
+
+html, body {
+  margin: 0 auto;
+  background-color: #c2e478;
+  font-family: sans-serif; }
+
+ul {
+  list-style-type: none;
+  padding: 0; }
+
+li {
+  padding: 0; }
+
+.content-layout {
+  margin: 0 auto;
+  width: 80%; }
+
+#search {
+  padding: 0;
+  margin: 1em 1em 1em 0; }
+
+#results {
+  text-align: left; }
+
+.githubrepo-has-action {
+  cursor: pointer; }
+
+.paginated .page-selected {
+  background-color: black; }
+.paginated > div {
+  padding: 1em 0; }
+  .paginated > div > span {
+    display: inline-block;
+    color: #FFF;
+    text-align: center;
+    background-color: #4B6D01;
+    border: 1px solid grey;
+    padding: 3px;
+    margin-left: 2px;
+    cursor: pointer;
+    min-width: 25px;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    -ms-border-radius: 4px;
+    border-radius: 4px; }
+  .paginated > div > span:hover {
+    background-color: black; }
+
+/*# sourceMappingURL=styles.css.map */

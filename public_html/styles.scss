@@ -1,0 +1,72 @@
+$buttonColor: #4B6D01;
+$bgcolor:  $buttonColor + #777;
+$buttonHard: $buttonColor - #CCC;
+    
+@mixin border-radius($radius) {
+  -webkit-border-radius: $radius;
+     -moz-border-radius: $radius;
+      -ms-border-radius: $radius;
+          border-radius: $radius;
+}
+* {
+    margin: 0;
+    padding: 0;
+}
+html, body {
+    margin: 0 auto;
+    background-color: $bgcolor;
+    font-family: sans-serif;
+}
+
+ul{
+    list-style-type: none;
+    padding: 0;
+}
+
+li{
+    padding: 0;
+}
+
+.content-layout {
+    margin: 0 auto;
+    width: 80%;
+    
+}
+
+#search {
+    padding: 0;
+    margin: 1em 1em 1em 0;
+}
+
+#results {
+    text-align: left;
+}
+
+.githubrepo-has-action {
+    cursor: pointer;
+}
+
+.paginated {
+    .page-selected {
+        background-color: $buttonHard;
+    }
+    > div {
+        padding: 1em 0;
+        > span {
+            display: inline-block;
+            color: #FFF;
+            text-align: center;
+            background-color: $buttonColor;
+            border: 1px solid grey;
+            padding: 3px;
+            margin-left: 2px;
+            cursor: pointer;
+            min-width: 25px;
+            @include border-radius(4px);
+        }
+        > span:hover {
+            background-color: $buttonHard;
+            
+        }
+    }
+}
