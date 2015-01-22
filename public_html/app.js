@@ -208,6 +208,7 @@
             container.append(name);
             container.append(list);
             list.hide();
+            name.attr("class", "githubrepo-has-action");
             name.on("click", function(){
                 list.toggle();
             });
@@ -309,7 +310,8 @@
             }
             if( typeof node === "string" || node instanceof jQuery || node.nodeType){
                 li.append(node);
-            }           
+            }
+            li.attr("class", "page-list-element");
             return li.children().length ? li : "";
         }
         
@@ -393,27 +395,32 @@
      * @param {String} idButton 
      * @returns {htmlELEMENT} dom node of a button
      */
-    function addButton(id, idButton){
+    function addButton(id, idButton, className){
         var wrap = $("#"+id).wrap("<div />").parent(),
             button = $("<button>Search github repositories</button>").attr("id", idButton);
         wrap.append(button);
+        wrap.attr("class", className);
         return button;
     }
     
     /**
      * Start app
      */
-    $(document).ready(function () {
-        var button = addButton("search", "searchBtn");
-            apisearcher = ApiSearcher(API_URL);
+    function main(){
+        var layoutClass = "content-layout", //main layout class:
+            button = addButton("search", "searchBtn", layoutClass);
+            apisearcher = ApiSearcher(API_URL),
+            resulDiv = $("#results"),
+            searchInput = $("#search");
          
+         resulDiv.attr("class", layoutClass)
          button.on("click", function(){
              apisearcher.doSearch($("#search").val());
          });
          
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
              GithubRepo.parseResponse(ev);
-             Paginator.container = $("#results");
+             Paginator.container = resulDiv;
              Paginator.items = GithubRepo.toRepositoryArray();
              Paginator.numItemsPage = GithubRepo.currentItems.length;
              Paginator.totalPages = Math.ceil(GithubRepo.total/Paginator.numItemsPage);
@@ -421,7 +428,7 @@
              Paginator.render();
          });
          
-         $("#search").on("keyup", function (e) {                
+         searchInput.on("keyup", function (e) {                
             if (e.keyCode == 13) {
                 var val= $(this).val();
                 if (total < 20) {
@@ -429,5 +436,9 @@
                 }
             }
         });
+    }
+    $(document).ready(function () {
+        
+        main();
     })
 })(jQuery)
