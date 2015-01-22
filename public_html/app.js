@@ -361,18 +361,76 @@
                 num = max <= this.totalPages ? max : this.totalPages, 
                 container = $("<div>"),
                 current = this.currentPage,
-                last = this.totalPages,
-                dif = last - current,
-                previous = this.currentPage > 1 ? $("<span><<</span>") : "",
-                next = dif > 1 ? $("<span>>></span>") : "",
+                total = this.totalPages,
+                limit = 3,
+                previous = $("<span><<</span>") ,
+                next =  $("<span>>></span>"),
                 i = 1,
                 dummy = $("<span>"+this.dots+"</span>"),
-                layers = new Array();
+                layers = new Array(num+2), 
+                begin = current <= limit, 
+                end = total-current <= limit,
+                ok = false;
             
-            if(current>1){
-               layers[i-1] = previous;
-               
+            layers[0] = previous;
+            layers[num+1] = next;
+            if(total <= num){
+                for(i=1; i<=num; i++){
+                    layers[i] =  $("<span>"+i+"</span>");                    
+                }
+                layers[current].addClass("page-selected");
+            }else {
+                //if current page is one of the first three: 123..678
+                if(begin || end){
+                    do{
+                        console.log("def ",i)
+                        ok = i === current ? i : null;
+                        if(i<limit){
+                            layers[i] =  $("<span>"+i+"</span>");
+                            i++;
+                        }else if(i === limit){
+                            layers[i] =  $("<span>"+i+"</span>");
+                            i = num;
+                        }else if(i > 4){
+                            layers[i] =  $("<span>"+total+"</span>");
+                            total--;
+                            i--;
+                        }                        
+                        if(ok) layers[ok].addClass(this.selected);
+                        
+                    }while(i !== 4);
+                    layers[4] = dummy;
+                }else {
+                    do {
+                        if(i<limit){
+                           layers[i] = $("<span>"+i+"</span>"); 
+                        }else if( i=== 3 || i === 5 ){
+                            if(current === 4){
+                                layers[i] = i; 
+                            }else{
+                               layers[i] = dummy; 
+                            }
+                            
+                        }else if(i===4){
+                            layers[i] = $("<span>"+current+"</span>");
+                            layers[i].addClass("page-selected");
+                        }else{
+                            console.log(total - (num-i))
+                            layers[i] = $("<span>"+total+"</span>");
+                        }
+                        i++;
+                    }while(i<=num);
+                }
             }
+            
+            
+            /*if(current < num){
+                
+            } else if(current === num){
+                
+            } else if(current > num && current <= this.totalPages){
+                
+            }*/
             
             /*if(current < 5 && last > num){
                 for(; i<=5; i++){
@@ -394,20 +452,20 @@
                 }else if(current > num){
                     
                 }
-            }*/
+            }
             
             if(last>current){
                 layers.push(next);
-            }
+            }*/
             
-            
+            /**/
             for(i=0; i<layers.length; i++){
                 if(layers[i]) container.append(layers[i]);
             }
             this.div.prepend(container);            
             this.buttons = layers;
             this.addPageActions();
-            this.buttons[this.currentPage].addClass(this.selected);
+            
         },
         
         /**
