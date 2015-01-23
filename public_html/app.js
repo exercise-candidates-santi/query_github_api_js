@@ -224,11 +224,12 @@
             return container;            
         }        
     }
+  
     /**
      * Quick paginator to show results.
      * @returns {app_L57.Paginator}
      */
-    var Paginator = {
+    var Paginator = {    
         container: null,
         div: null,
         ul: null,
@@ -242,6 +243,104 @@
         provider: null,
         dots: "...",
         buttons: null,
+        
+        /**
+         * Object to create the buttons
+         */
+        buttonGenerator: {
+            getRandomInt: function (min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            },
+            generateBegin: function (medium, current, end, nums) {
+                var l = nums.length - 1;
+                for (var i = 1; i < l; i++) {
+                    if (i <= medium) {
+                        nums[i] = i === current ? "-" + i + "-" : i;
+                    } else if (i === medium + 1) {
+                        nums[i] = "...";
+                    } else {
+                        nums[i] = end - (l - 1 - i);
+                    }
+                }
+                return nums;
+            },
+            generateEnd: function (medium, current, end, nums) {
+                var l = nums.length - 2;
+                for (var i = l; i >= 1; i--) {
+                    if (i >= medium) {
+                        nums[i] = end === current ? "-" + end + "-" : end;
+                        end--;
+                    } else if (i === medium - 1) {
+                        nums[i] = "...";
+                    } else {
+                        nums[i] = i;
+                    }
+                }
+                return nums;
+            },
+            generatePlain: function (current, total, nums) {
+                var l = nums.length - 1;
+                for (var i = 1; i < l; i++) {
+                    if (i === current) {
+                        nums[i] = "-" + i + "-";
+                    } else {
+                        if (i > total) {
+                            nums[i] = null;
+                        } else {
+                            nums[i] = i;
+                        }
+                    }
+                    //nums[i] = i === current ? "-" + i + "-" : i;
+                }
+                return nums;
+            },
+            generateMedium: function (medium, current, total, nums) {
+                var l = nums.length - 2,
+                        before = medium - 1,
+                        after = medium + 1;
+                nums[medium] = "-" + current + "-";
+                nums[before] = "...";
+                nums[after] = "...";
+                for (var i = 1; i < before; i++) {
+                    nums[i] = i;
+                }
+                for (var i = l; i > after; i--) {
+                    nums[i] = total - (l - i);
+                }
+                return nums;
+            },
+            generateButtonPositions: function (total, max, current) {
+                var l = max + 2,
+                        medium = (function () {
+                            if (max % 2 === 0) {
+                                max--;
+                            }
+                            return Math.floor(max / 2) + 1;
+                        })(),
+                        nums = new Array(max + 2),
+                        beggining = current <= medium,
+                        ending = medium > total - current;
+
+                nums[0] = "<<";
+                nums[l - 1] = ">>";
+                if (total <= max) {
+                    return this.generatePlain(current, total, nums);
+                } else {
+                    if (beggining) {
+                        return this.generateBegin(medium, current, total, nums);
+                    } else if (ending) {
+                        return this.generateEnd(medium, current, total, nums);
+                    } else {
+                        return this.generateMedium(medium, current, total, nums);
+                    }
+                }
+            },
+            generateButtons: function(container, total, max, current){
+                console.log(this === Paginator.buttonGenerator)
+                var buttonNumbers = this.generateButtonPositions(total, max, current);
+                
+            }
+        },        
         
         /**
          * Allows to render any kind of object
@@ -362,109 +461,14 @@
                 container = $("<div>"),
                 current = this.currentPage,
                 total = this.totalPages,
-                limit = 3,
                 previous = $("<span><<</span>") ,
                 next =  $("<span>>></span>"),
-                i = 1,
-                dummy = $("<span>"+this.dots+"</span>"),
-                layers = new Array(num+2), 
-                begin = current <= limit, 
-                end = total-current <= limit,
-                ok = false;
-            
-            layers[0] = previous;
-            layers[num+1] = next;
-            if(total <= num){
-                for(i=1; i<=num; i++){
-                    layers[i] =  $("<span>"+i+"</span>");                    
-                }
-                layers[current].addClass("page-selected");
-            }else {
-                //if current page is one of the first three: 123..678
-                if(begin || end){
-                    do{
-                        console.log("def ",i)
-                        ok = i === current ? i : null;
-                        if(i<limit){
-                            layers[i] =  $("<span>"+i+"</span>");
-                            i++;
-                        }else if(i === limit){
-                            layers[i] =  $("<span>"+i+"</span>");
-                            i = num;
-                        }else if(i > 4){
-                            layers[i] =  $("<span>"+total+"</span>");
-                            total--;
-                            i--;
-                        }                        
-                        if(ok) layers[ok].addClass(this.selected);
-                        
-                    }while(i !== 4);
-                    layers[4] = dummy;
-                }else {
-                    do {
-                        if(i<limit){
-                           layers[i] = $("<span>"+i+"</span>"); 
-                        }else if( i=== 3 || i === 5 ){
-                            if(current === 4){
-                                layers[i] = i; 
-                            }else{
-                               layers[i] = dummy; 
-                            }
-                            
-                        }else if(i===4){
-                            layers[i] = $("<span>"+current+"</span>");
-                            layers[i].addClass("page-selected");
-                        }else{
-                            console.log(total - (num-i))
-                            layers[i] = $("<span>"+total+"</span>");
-                        }
-                        i++;
-                    }while(i<=num);
-                }
-            }
-            
-            
-            /*if(current < num){
-                
-            } else if(current === num){
-                
-            } else if(current > num && current <= this.totalPages){
-                
-            }*/
-            
-            /*if(current < 5 && last > num){
-                for(; i<=5; i++){
-                    layers[i] =  $("<span>"+i+"</span>");
-                }
-                layers[6] =  dummy;
-                layers[7] =  $("<span>"+last+"</span>");
-            } else if(current >= 5){
-                for(var i=1; i<=num; i++){
-                    layers[i] =  $("<span>"+i+"</span>");
-                }
-                if(current < num){
-                    layers[5] =  $("<span>"+current+"</span>");
-                    i = 6;
-                    while(i<num){
-                       layers[i] =  num;
-                       i++;
-                    }
-                }else if(current > num){
-                    
-                }
-            }
-            
-            if(last>current){
-                layers.push(next);
-            }*/
-            
-            /**/
-            for(i=0; i<layers.length; i++){
-                if(layers[i]) container.append(layers[i]);
-            }
-            this.div.prepend(container);            
-            this.buttons = layers;
-            this.addPageActions();
+                dummy = $("<span>"+this.dots+"</span>");        
+            container.attr("class", this.class+"-buttons");
+            this.div.prepend(container);
+            this.buttonGenerator.generateButtons(container, total, max, current);
+            //this.buttons = layers;
+            //this.addPageActions();
             
         },
         
@@ -612,8 +616,7 @@
             }
         });
     }
-    $(document).ready(function () {
-        
+    $(document).ready(function () {        
         main();
     })
 })(jQuery)
