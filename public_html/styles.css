@@ -16,7 +16,7 @@ li {
 
 .content-layout {
   margin: 0 auto;
-  width: 80%; }
+  width: 40%; }
 
 #search {
   padding: 0;
@@ -30,6 +30,18 @@ li {
 
 .paginated .page-selected {
   background-color: black; }
+.paginated .page-list-element {
+  margin: 1em 0;
+  padding: 1em;
+  border: 3px solid #4B6D01;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  -ms-border-radius: 10px;
+  border-radius: 10px; }
+  .paginated .page-list-element ul {
+    padding-left: 1em;
+    padding-top: 1em;
+    border-top: 2px solid #4B6D01; }
 .paginated > div {
   padding: 1em 0; }
   .paginated > div > span {
@@ -48,5 +60,13 @@ li {
     border-radius: 4px; }
   .paginated > div > span:hover {
     background-color: black; }
+.paginated .owner em {
+  display: inline-block;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 1.1em;
+  color: black;
+  padding: 0.2em;
+  width: 85px; }
 
 /*# sourceMappingURL=styles.css.map */

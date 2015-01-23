@@ -29,7 +29,7 @@ li{
 
 .content-layout {
     margin: 0 auto;
-    width: 80%;
+    width: 40%;
     
 }
 
@@ -44,11 +44,23 @@ li{
 
 .githubrepo-has-action {
     cursor: pointer;
+    
 }
 
 .paginated {
     .page-selected {
         background-color: $buttonHard;
+    }
+    .page-list-element {
+        margin: 1em 0;
+        padding: 1em;
+        border: 3px solid $buttonColor;
+        @include border-radius(10px);
+        ul{
+            padding-left: 1em;
+            padding-top: 1em;
+            border-top: 2px solid $buttonColor;
+        }
     }
     > div {
         padding: 1em 0;
@@ -67,6 +79,18 @@ li{
         > span:hover {
             background-color: $buttonHard;
             
+        }
+    }
+    
+    .owner {
+        em {
+            display: inline-block;
+            font-style: normal;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: $buttonHard;
+            padding: 0.2em;
+            width: 85px;
         }
     }
 }

@@ -52,10 +52,93 @@
  */
 
 (function ($) {
-    var PAGE = 1,
-        noop = function(){},
-        API_URL = "https://api.github.com/search/repositories",
-        total = 1;
+    var API_URL = "https://api.github.com/search/repositories";
+        
+       /**
+     * Creates an instance to search an api
+     * @param {String} url the API's url
+     * @param {Function} defaultSuccessCb we can pass a search callback in the constructor
+     * @param {Function} defaultErrorCb we can pass an error callback in the constructor
+     * @returns {ApiSearcher}
+     */
+    function ApiSearcher(url, defaultSuccessCb, defaultErrorCb){
+        if( !(this instanceof ApiSearcher) ){
+            return new ApiSearcher(url, defaultSuccessCb, defaultErrorCb);
+        }
+        var noop = function(){};
+        this.apiUrl = url;
+        this.customSuccess = $.isFunction(defaultSuccessCb) ? defaultSuccessCb : noop;
+        this.customError = $.isFunction(defaultErrorCb) ? defaultErrorCb : noop;
+        
+    }
+    
+    /**
+     * Personal Authentication Token that allows us to call 20 times in a minute.
+     * See: https://github.com/blog/1509-personal-api-tokens
+     */
+     //2161f323efe781e7c9c8cb9986abb3c5ccf30cef
+    
+    ApiSearcher.SEARCH = "ON_SEARCH";
+    ApiSearcher.ERROR = "ON_ERROR";
+    
+    ApiSearcher.prototype = {
+        defaultSuccess: function(data_, res, xhr){
+            this.customSuccess.call(this, data_, res, xhr);
+            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
+            $(this).trigger(ev);
+        },
+        defaultError: function(data_, res, xhr){            
+            this.customError.call(this, data_, res);
+            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
+            this.trigger(ev);
+        },
+        trigger: function(ev){
+            $(this).trigger(ev);
+        },
+        on: function(ev, action){
+          $(this).on(ev, action);  
+        },
+        off: function(ev, action){
+          $(this).off(ev, action);  
+        },
+        
+        prepareParams: function(val, token){
+            return {q: val, access_token: token};
+        },
+        
+        /**
+         * Method to make the ajax call tto the API
+         * @param {String} val string to search
+         * @param {String} token_ authentication token, if null we use ApiSearcher.ACCESS_TOKEN
+         */
+        doSearch: function (val) {
+            if(!val) return;
+            
+            var self = this,                
+                ajaxOptions = {
+                    type: "GET",
+                    url: self.apiUrl,
+                    dataType: "json",
+                    data: self.prepareParams(val),
+                    success: function(response, res, xhr){
+                        self.defaultSuccess(response, res, xhr);
+                    },
+                    error: function(response, res, xhr){
+                        self.defaultError(response, res, xhr);
+                    }
+                };
+            $.ajax(ajaxOptions);
+        },
+        /**
+         * 
+         * @param {type} val
+         * @param {type} token_
+         * @returns {undefined}
+         */
+        provide: function(val){
+            this.doSearch(val);
+        }
+    }
     
     var GithubRepoApi = {
         /**
@@ -108,6 +191,10 @@
          */
         total: 0,
         
+        Provider: function(url, defaultSuccessCb, defaultErrorCb){
+            ApiSearcher.call(this, url, defaultSuccessCb, defaultErrorCb);
+        },
+        
         /**
          * We extract all the data from the response
          * @param {Object} ev event object with the response and the xhr object
@@ -118,23 +205,31 @@
             //We get position of search in the pagination of github through the link header
             if(ev.xhr){
                 this.last = 0;
-                var st = ev.xhr.getResponseHeader("link"),
+                
+                try{
+                    var st = ev.xhr.getResponseHeader("link"),
                     re = /\<(https.+)\>.+(rel=["\']next["\']).+\<(https.+)\>.+(rel=["\']last["\'])/g,
-                    res = re.exec(st), splitTmp;
-                //if there are more than 1 page  
-                if(res && res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
-                    splitTmp = res[1].split("page=");
-                    this.url = splitTmp[0];
-                    this.current = parseInt(splitTmp[1], 10) - 1;
-                    splitTmp = res[3].split("page=");
-                    this.last = parseInt(splitTmp[1], 10);
-                }else {
-                    this.current = 1;
-                }             
-                this.xRateLimit = ev.xhr.getResponseHeader("X-RateLimit-Limit");
-                this.xRateLimitRemain = ev.xhr.getResponseHeader("X-RateLimit-Remaining");
-                this.xRateLimitReset = parseInt(ev.xhr.getResponseHeader("X-RateLimit-Reset"), 10) * 1000;
-                this.headers = ev.xhr.getAllResponseHeaders();
+                    res, splitTmp;
+                
+                    res = re.exec(st)
+                    //if there are more than 1 page  
+                    if(res && res.length === 5 && res[2].indexOf("next") !== -1 && res[4].indexOf("last") !== -1) {                    
+                        splitTmp = res[1].split("page=");
+                        this.url = splitTmp[0];
+                        this.current = parseInt(splitTmp[1], 10) - 1;
+                        splitTmp = res[3].split("page=");
+                        this.last = parseInt(splitTmp[1], 10);
+                    }else {
+                        this.current = 1;
+                    }             
+                    this.xRateLimit = ev.xhr.getResponseHeader("X-RateLimit-Limit");
+                    this.xRateLimitRemain = ev.xhr.getResponseHeader("X-RateLimit-Remaining");
+                    this.xRateLimitReset = parseInt(ev.xhr.getResponseHeader("X-RateLimit-Reset"), 10) * 1000;
+                    this.headers = ev.xhr.getAllResponseHeaders();
+                }catch(e){
+                    alert("Error: "+e.message)
+                }
+                 
             }
             if(ev.response){
                 this.currentItems = ev.response.items || [];
@@ -160,6 +255,7 @@
             return repositories;
         }
     }
+    GithubRepoApi.ACCESS_TOKEN = "2161f323efe781e7c9c8cb9986abb3c5ccf30cef";
     /**
      * We instance an object with the required data from each repository
      * We just save the properties we need to save memory
@@ -182,20 +278,28 @@
     
     GithubRepoApi.Repository.prototype = {
         /**
+         * Utility to correct a bug with some names creating the list
+         */
+        htmlEntities: function(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        },
+        /**
          * Utility method to create a dom list of properties
          * @returns {Object} jQuery object with a list of properties
          */
         renderProperties: function(){
             var props = this.properties,
                 ul = $("<ul />"), 
-                li, fixProp, cleanProp;
+                li, fixProp, cleanProp,html;
           for(var prop in props){
               if( props.hasOwnProperty(prop) ){
                   fixProp = prop.replace("_", " ");
+                  props[prop] = this.htmlEntities( props[prop] );
                   cleanProp = (prop === "url" || prop === "followers") ?
                             "<a href='"+props[prop]+"' target='_blank'>"+props[prop]+"</a>" 
                             : props[prop];
                   li = $("<li><span>"+fixProp+": </span>" + "<span>"+cleanProp+"</span></li>");
+                  //html = "<li><span>"+fixProp+": </span>" + "<span>"+cleanProp+"</span></li>";
                   ul.append(li);
               }
           }
@@ -208,7 +312,8 @@
          */
         render: function(){
             var container = $("<div />"),
-                name = $("<div><span>"+this.owner+": </span>" + "<span>"+this.name+"</span></div>"),
+                name = $("<div><div class='owner'><em>Owner: </em><span>"+this.owner+"</span></div>" 
+                        + "<div class='owner'><em>Name: </em><span>"+this.name+"</span></div></div>"),
                 list = this.renderProperties();
             container.append(name);
             container.append(list);
@@ -216,11 +321,55 @@
             name.attr("class", "githubrepo-has-action");
             name.on("click", function(){
                 list.toggle();
-            });
-            
+            });            
             return container;            
         }        
     }
+    GithubRepoApi.Provider.prototype = new ApiSearcher();
+    
+    /**
+     * We create the object that we'll pass to make the ajax call
+     * @param {Object | Number} obj
+     * @returns Object {q=query_val, page: num_page, access_token: access_token}
+     */
+    GithubRepoApi.Provider.prototype.prepareParams = function(obj){
+        var ob = $.isPlainObject(ob)? obj : {};
+        if(!ob.q) ob.q = $("#search").val();
+        if(!ob.page) ob.page = !isNaN(obj) ? parseInt(obj, 10) : 1;
+        ob["access_token"] = GithubRepoApi.ACCESS_TOKEN;
+        return ob;
+    };
+    
+    /**
+     * The github API has a limit of 20 calls per minute for authorized users.
+     * We check this limit here. 
+     * 
+     * @returns {Number} Number of seconds we have to wait to make the call
+     */
+    GithubRepoApi.Provider.prototype.timeLimit = function(){
+        if( GithubRepoApi.xRateLimitRemain > 0){
+            return 0;
+        }
+        return GithubRepoApi.xRateLimitReset - (new Date()).getTime();
+    }
+    /**
+     * We search the github API asynchronously and we check if we are within its time limits
+     * @param {type} val
+     * @returns {undefined}
+     */
+    GithubRepoApi.Provider.prototype.provide = function(val){
+        var limitSeconds = this.timeLimit();
+        if( limitSeconds === 0 ){
+            this.doSearch(val);
+        } else {
+            var self = this;
+            setTimeout(function(){
+                self.doSearch(val);
+            }, limitSeconds);
+        }
+        
+    }
+    
   
     /**
      * Quick paginator to show results.
@@ -249,6 +398,7 @@
                 return Math.floor(Math.random() * (max - min + 1)) + min;
             },
             generateBegin: function (medium, current, end, nums) {
+                
                 var l = nums.length - 1,
                         index = null;
                 for (var i = 1; i < l; i++) {
@@ -262,6 +412,7 @@
                     } else {
                         nums[i] = end - (l - 1 - i);
                     }
+                    
                 }
                 return {btnNums: nums, pos:index};
             },
@@ -272,7 +423,7 @@
                     if (i >= medium) {
                         //nums[i] = end === current ? "-" + end + "-" : end;
                         if(end === current){
-                            index = end;
+                            index = i;
                         }
                         nums[i] = end;
                         end--;
@@ -285,7 +436,7 @@
                 //return nums;
                 return {btnNums: nums, pos:index};
             },
-            generatePlain: function (current, total, nums) {
+            generatePlain: function (current, total, nums) {                
                 var l = nums.length - 1,
                         index = null;
                 for (var i = 1; i < l; i++) {
@@ -312,6 +463,7 @@
                 nums[medium] = current;
                 nums[before] = this.dots;
                 nums[after] = this.dots;
+                
                 for (var i = 1; i < before; i++) {
                     nums[i] = i;
                 }
@@ -330,7 +482,7 @@
                             return Math.floor(max / 2) + 1;
                         })(),
                         nums = new Array(max + 2),
-                        beggining = current <= medium,
+                        beginning = current <= medium,
                         ending = medium > total - current;
 
                 nums[0] = "<<";
@@ -338,7 +490,7 @@
                 if (total <= max) {
                     return this.generatePlain(current, total, nums);
                 } else {
-                    if (beggining) {
+                    if (beginning) {
                         return this.generateBegin(medium, current, total, nums);
                     } else if (ending) {
                         return this.generateEnd(medium, current, total, nums);
@@ -348,30 +500,34 @@
                 }
             },
             generateButtons: function(container, total, max, current){                
-                var buttonNumbers = this.generateButtonPositions(total, max, current),
+                var buttonNumbers = this.generateButtonPositions(total, max, parseInt(current, 10)),
                     txts = buttonNumbers.btnNums,
                     p = buttonNumbers.pos,
                     buttons = [],
                     dots = Paginator.dots,
                     lastPos = txts.length-1,
                     tmpBtn;
-                console.log(buttonNumbers)
                 if(p !== 1){
-                    tmp =$("<span>"+txts[0]+"</span>");
+                    tmp = $("<span>"+txts[0]+"</span>");
                     container.append(tmp);
+                    Paginator.addButtonActions(tmp, "goPrevious");
                     buttons[0] = tmp;
                 }
                 for(var i=1; i<txts.length-1; i++){
                     if(txts[i]){
                         tmp =$("<span>"+txts[i]+"</span>");
                         container.append(tmp);
+                        Paginator.addButtonActions(tmp, "goToPage");
                         buttons[i] = tmp;
                     }
                 }
                 if(p !== max){
-                    buttons.push($("<span>"+txts[lastPos]+"</span>"));
+                    tmp = $("<span>"+txts[lastPos]+"</span>");
+                    buttons.push(tmp);
+                    Paginator.addButtonActions(tmp, "goNext");
                     container.append(buttons[buttons.length-1])
                 }
+                buttons[p].addClass(Paginator.selected);
                 return buttons;
             }
         },        
@@ -411,14 +567,19 @@
                 for(var i=0; i<items.length; i++){
                     if(items[i]){                        
                         tmpLi = this.toLiNode(items[i]);
-                        if(tmpLi){
-                            this.ul.append(tmpLi);
+                        
+                        if(tmpLi instanceof $){
+                            try {
+                                this.ul.append(tmpLi);
+                            }catch(e){
+                                console.log(e.message, i, tmpLi.html())
+                            }
                         }
                         
                     }
                 }
-            }catch(e){               
-                throw Error("Could not render items. ",e.message);
+            }catch(e){
+                throw Error("Could not render items: ",e);
             }
 
         },
@@ -443,50 +604,35 @@
         },
         
         /**
-         * Adds actions to buttons
+         * Creates pagination buttons
          */
-        addPageActions: function(){
-            var self = this, l;
-            if($.isArray(this.buttons)){
-                l = this.buttons.length;
-                //return;
-                try {
-                    if(this.buttons[0]){
-                        this.buttons[0].on("click", function(){
-                            self.goPrevious();
-                        });
-                    }
-                    if(this.buttons[l-1]){
-                        this.buttons[l-1].on("click", function(){
-                            self.goNext();
-                        });
-                    }
-                    for(var i=1; i<l-1; i++){
-                        if(this.buttons[i] && this.buttons[i].text() !== this.dots){
-                            this.buttons[i].on("click", function(){
-                                self.goToPage();
-                            });
-                        }
-                    }
-                }catch(e){
-                    alert(e);
-                }
-            }
+        
+        addButtonActions: function(button, action){
+            var self = this;
+            if( !$.isFunction(self[action]) || !button instanceof $ ) return;
+            button.on("click", function(){
+                var val = $(this).text();
+                self[action].call(self, val)
+            });
         },
         goNext: function(){
             if(this.currentPage < this.totalPages){
                 this.currentPage++;
+                this.provider.provide(this.currentPage);
                 this.paginate();
             }
         },
         goPrevious: function(){
             if(this.currentPage > 1){
                 this.currentPage--;
+                this.provider.provide(this.currentPage);
                 this.paginate();
             }
         },
-        goToPage: function(){
-            
+        goToPage: function(page){
+            this.currentPage = page;
+            this.provider.provide(this.currentPage);
+            this.paginate();
         },
         createPages: function(){
             if( !this.div instanceof $ ) return;
@@ -517,7 +663,7 @@
             
             if( typeof item.render !== "function" ){
                 node = this.renderer(item);
-            }else{
+            }else{                
                 node = item.render();
             }
             if( typeof node === "string" || node instanceof jQuery || node.nodeType){
@@ -527,78 +673,6 @@
             return li.children().length ? li : "";
         }
         
-    }
-    
-    /**
-     * Creates an instance to search an api
-     * @param {String} url the API's url
-     * @param {Function} defaultSuccessCb we can pass a search callback in the constructor
-     * @param {Function} defaultErrorCb we can pass an error callback in the constructor
-     * @returns {ApiSearcher}
-     */
-    function ApiSearcher(url, defaultSuccessCb, defaultErrorCb){
-        if( !(this instanceof ApiSearcher) ){
-            return new ApiSearcher(url, defaultSuccessCb, defaultErrorCb);
-        }
-        var noop = function(){};
-        this.apiUrl = url;
-        this.customSuccess = $.isFunction(defaultSuccessCb) ? defaultSuccessCb : noop;
-        this.customError = $.isFunction(defaultErrorCb) ? defaultErrorCb : noop;
-        
-    }
-    
-    /**
-     * Personal Authentication Token that allows us to call 20 times in a minute.
-     * See: https://github.com/blog/1509-personal-api-tokens
-     */
-    ApiSearcher.ACCESS_TOKEN = "2161f323efe781e7c9c8cb9986abb3c5ccf30cef";
-    
-    ApiSearcher.SEARCH = "ON_SEARCH";
-    ApiSearcher.ERROR = "ON_ERROR";
-    
-    ApiSearcher.prototype = {
-        defaultSuccess: function(data_, res, xhr){
-            this.customSuccess.call(this, data_, res, xhr);
-            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
-            $(this).trigger(ev);
-        },
-        defaultError: function(data_, res, xhr){            
-            this.customError.call(this, data_, res);
-            var ev = $.Event( ApiSearcher.SEARCH, { response: data_,  result:res, xhr:xhr, target: this} ); 
-            this.trigger(ev);
-        },
-        trigger: function(ev){
-            $(this).trigger(ev);
-        },
-        on: function(ev, action){
-          $(this).on(ev, action);  
-        },
-        off: function(ev, action){
-          $(this).off(ev, action);  
-        },
-        
-        /**
-         * Method to make the ajax call to the API
-         * @param {String} val string to search
-         * @param {String} token_ authentication token, if null we use ApiSearcher.ACCESS_TOKEN
-         */
-        doSearch: function (val, token_) {
-            var self = this,
-                token = token_ || ApiSearcher.ACCESS_TOKEN,
-                ajaxOptions = {
-                    type: "GET",
-                    url: self.apiUrl,
-                    dataType: "json",
-                    data: {q: val, access_token: token},
-                    success: function(response, res, xhr){
-                        self.defaultSuccess(response, res, xhr);
-                    },
-                    error: function(response, res, xhr){
-                        self.defaultError(response, res, xhr);
-                    }
-                };
-            $.ajax(ajaxOptions);
-        }
     }
     
     /**
@@ -621,15 +695,19 @@
     function main(){
         var layoutClass = "content-layout", //main layout class:
             button = addButton("search", "searchBtn", layoutClass);
-            apisearcher = ApiSearcher(API_URL),
+            apisearcher = new GithubRepoApi.Provider(API_URL);//ApiSearcher(API_URL),
             resulDiv = $("#results"),
             searchInput = $("#search");
          
+         
          resulDiv.attr("class", layoutClass)
          button.on("click", function(){
-             apisearcher.doSearch($("#search").val());
+             apisearcher.provide({
+                q: searchInput.val(),
+                page: 1
+            });
          });
-         
+         Paginator.provider = apisearcher;
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
              GithubRepoApi.parseResponse(ev);
              Paginator.container = resulDiv;
@@ -641,12 +719,15 @@
              Paginator.render();
          });
          
+         apisearcher.on(ApiSearcher.ERROR, function(ev){
+             alert(ev)
+         })
          searchInput.on("keyup", function (e) {                
-            if (e.keyCode == 13) {
-                var val= $(this).val();
-                if (total < 20) {
-                    apisearcher.doSearch(val);
-                }
+            if (e.keyCode == 13) {          
+                apisearcher.provide({
+                    q: searchInput.val(),
+                    page: 1
+                });               
             }
         });
     }
