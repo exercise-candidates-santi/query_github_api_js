@@ -241,48 +241,60 @@
         selected: 'page-selected',
         pages: 0,
         provider: null,
-        dots: "...",
         buttons: null,
         
         /**
          * Object to create the buttons
          */
         buttonGenerator: {
+            dots: "...",
             getRandomInt: function (min, max) {
                 return Math.floor(Math.random() * (max - min + 1)) + min;
             },
             generateBegin: function (medium, current, end, nums) {
-                var l = nums.length - 1;
+                var l = nums.length - 1,
+                        index = null;
                 for (var i = 1; i < l; i++) {
                     if (i <= medium) {
-                        nums[i] = i === current ? "-" + i + "-" : i;
+                        if(i === current){
+                            index = i;
+                        }
+                        nums[i] = i;
                     } else if (i === medium + 1) {
-                        nums[i] = "...";
+                        nums[i] = this.dots;
                     } else {
                         nums[i] = end - (l - 1 - i);
                     }
                 }
-                return nums;
+                return {btnNums: nums, pos:index};
             },
             generateEnd: function (medium, current, end, nums) {
-                var l = nums.length - 2;
+                var l = nums.length - 2,
+                        index = null;
                 for (var i = l; i >= 1; i--) {
                     if (i >= medium) {
-                        nums[i] = end === current ? "-" + end + "-" : end;
+                        //nums[i] = end === current ? "-" + end + "-" : end;
+                        if(end === current){
+                            index = end;
+                        }
+                        nums[i] = end;
                         end--;
                     } else if (i === medium - 1) {
-                        nums[i] = "...";
+                        nums[i] = this.dots;
                     } else {
                         nums[i] = i;
                     }
                 }
-                return nums;
+                //return nums;
+                return {btnNums: nums, pos:index};
             },
             generatePlain: function (current, total, nums) {
-                var l = nums.length - 1;
+                var l = nums.length - 1,
+                        index = null;
                 for (var i = 1; i < l; i++) {
                     if (i === current) {
-                        nums[i] = "-" + i + "-";
+                        nums[i] = i;
+                        index = i;
                     } else {
                         if (i > total) {
                             nums[i] = null;
@@ -292,22 +304,25 @@
                     }
                     //nums[i] = i === current ? "-" + i + "-" : i;
                 }
-                return nums;
+                //return nums;
+                return {btnNums: nums, pos:index};
             },
             generateMedium: function (medium, current, total, nums) {
                 var l = nums.length - 2,
                         before = medium - 1,
-                        after = medium + 1;
-                nums[medium] = "-" + current + "-";
-                nums[before] = "...";
-                nums[after] = "...";
+                        after = medium + 1,
+                        index = null;
+                nums[medium] = current;
+                nums[before] = this.dots;
+                nums[after] = this.dots;
                 for (var i = 1; i < before; i++) {
                     nums[i] = i;
                 }
                 for (var i = l; i > after; i--) {
                     nums[i] = total - (l - i);
                 }
-                return nums;
+                //return nums;
+                return {btnNums: nums, pos:medium};
             },
             generateButtonPositions: function (total, max, current) {
                 var l = max + 2,
@@ -335,10 +350,32 @@
                     }
                 }
             },
-            generateButtons: function(container, total, max, current){
-                console.log(this === Paginator.buttonGenerator)
-                var buttonNumbers = this.generateButtonPositions(total, max, current);
-                
+            generateButtons: function(container, total, max, current){                
+                var buttonNumbers = this.generateButtonPositions(total, max, current),
+                    txts = buttonNumbers.btnNums,
+                    p = buttonNumbers.pos,
+                    buttons = [],
+                    dots = Paginator.dots,
+                    lastPos = txts.length-1,
+                    tmpBtn;
+                console.log(buttonNumbers)
+                if(p !== 1){
+                    tmp =$("<span>"+txts[0]+"</span>");
+                    container.append(tmp);
+                    buttons[0] = tmp;
+                }
+                for(var i=1; i<txts.length-1; i++){
+                    if(txts[i]){
+                        tmp =$("<span>"+txts[i]+"</span>");
+                        container.append(tmp);
+                        buttons[i] = tmp;
+                    }
+                }
+                if(p !== max){
+                    buttons.push($("<span>"+txts[lastPos]+"</span>"));
+                    container.append(buttons[buttons.length-1])
+                }
+                return buttons;
             }
         },        
         
