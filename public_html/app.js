@@ -51,9 +51,6 @@
  * 
  */
 
-/**
- * Encapsulating actions an jQuery object
- */
 (function ($) {
     var PAGE = 1,
         noop = function(){},
