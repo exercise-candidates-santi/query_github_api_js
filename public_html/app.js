@@ -80,6 +80,7 @@
     
     ApiSearcher.SEARCH = "ON_SEARCH";
     ApiSearcher.ERROR = "ON_ERROR";
+    ApiSearcher.PROVIDE = "ON_PROVIDE"
     
     ApiSearcher.prototype = {
         defaultSuccess: function(data_, res, xhr){
@@ -112,14 +113,15 @@
          * @param {String} token_ authentication token, if null we use ApiSearcher.ACCESS_TOKEN
          */
         doSearch: function (val) {
-            if(!val) return;
+            var data = this.prepareParams(val);
+            if(!data || $.isEmptyObject(data)) return;          
             
             var self = this,                
                 ajaxOptions = {
                     type: "GET",
                     url: self.apiUrl,
                     dataType: "json",
-                    data: self.prepareParams(val),
+                    data: data,
                     success: function(response, res, xhr){
                         self.defaultSuccess(response, res, xhr);
                     },
@@ -187,12 +189,18 @@
         xRateLimitReset: 0,
         
         /**
+         * Id to check if we need to save a cache locally
+         */
+        cacheControl: "saveLocal",
+        
+        /**
          * Total number of repositories.
          */
         total: 0,
         
         Provider: function(url, defaultSuccessCb, defaultErrorCb){
             ApiSearcher.call(this, url, defaultSuccessCb, defaultErrorCb);
+            this.currentSearch = {};
         },
         
         /**
@@ -320,7 +328,7 @@
             list.hide();
             name.attr("class", "githubrepo-has-action");
             name.on("click", function(){
-                list.toggle();
+                list.slideToggle("fast");
             });            
             return container;            
         }        
@@ -332,12 +340,21 @@
      * @param {Object | Number} obj
      * @returns Object {q=query_val, page: num_page, access_token: access_token}
      */
-    GithubRepoApi.Provider.prototype.prepareParams = function(obj){
-        var ob = $.isPlainObject(ob)? obj : {};
-        if(!ob.q) ob.q = $("#search").val();
+    GithubRepoApi.Provider.prototype.createParams = function(obj){
+        var ob = $.isPlainObject(ob)? obj : {},
+            val = $("#search").val();
+        if(!val) return {};
+        if(!ob.q) ob.q = val;
         if(!ob.page) ob.page = !isNaN(obj) ? parseInt(obj, 10) : 1;
         ob["access_token"] = GithubRepoApi.ACCESS_TOKEN;
         return ob;
+    }
+    //
+    GithubRepoApi.Provider.prototype.prepareParams = function(obj){
+        if( $.isEmptyObject(this.currentSearch) ) {
+            this.currentSearch = this.createParams(obj);
+        }
+        return this.currentSearch;
     };
     
     /**
@@ -352,24 +369,75 @@
         }
         return GithubRepoApi.xRateLimitReset - (new Date()).getTime();
     }
+    
+    GithubRepoApi.Provider.prototype.checkCache = function(){
+        return $("#"+GithubRepoApi.cacheControl).is(":checked");
+    }
+    
+    GithubRepoApi.Provider.prototype.saveCache = function(name, page, vals){
+        if(!this.checkCache()) return false;
+        var n = name ? name : this.currentSearch.q,
+            p = page ? page : this.currentSearch.page,
+            cache = this.getCache(n, p) || new Array(GithubRepoApi.last);
+        if( !n || isNaN(p))return null;
+        cache[p] = vals ? vals : GithubRepoApi.currentItems;
+        sessionStorage.setItem(n, JSON.stringify(cache));
+        return true;
+    }
+    
+    GithubRepoApi.Provider.prototype.removeCache = function(name, page){
+        var cache;
+        if(name && isNaN(p)){
+            cache = this.getCache(name);
+            cache[page] = null;
+            sessionStorage.setItem(n, JSON.stringify(cache));
+        }else if(name && !isNaN(p)){
+            sessionStorage.removeItem(name);
+        }
+    }
+    
+    GithubRepoApi.Provider.prototype.getCache = function(name){
+        if(!this.checkCache()) return null;
+        var cache = JSON.parse(sessionStorage.getItem(name));
+        
+        if(!cache || !cache.length) return null;
+        return cache;
+    }
     /**
      * We search the github API asynchronously and we check if we are within its time limits
      * @param {type} val
      * @returns {undefined}
      */
     GithubRepoApi.Provider.prototype.provide = function(val){
-        var limitSeconds = this.timeLimit();
+        var hasCache = false, self=this, cache, ev, limitSeconds;
+        this.currentSearch = this.createParams(val);
+        if(this.checkCache()){
+            cache = this.getCache(this.currentSearch.q);
+            if($.isArray(cache) && $.isArray(cache[this.currentSearch.page]) &&cache[this.currentSearch.page].length) {
+                GithubRepoApi.currentItems = cache[this.currentSearch.page];
+                
+                this.totalPages = cache.length;
+                this.current = this.currentSearch.page;
+                ev = $.Event( ApiSearcher.PROVIDE, { currentItems: GithubRepoApi.toRepositoryArray(),
+                                                    total: this.totalPages,
+                                                    current: this.currentSearch.page
+                                                    } );
+                this.trigger(ev);
+                return;
+            }
+        }
+        limitSeconds = this.timeLimit();
+        
         if( limitSeconds === 0 ){
             this.doSearch(val);
         } else {
-            var self = this;
+            self = this;
             setTimeout(function(){
                 self.doSearch(val);
             }, limitSeconds);
         }
         
     }
-    
   
     /**
      * Quick paginator to show results.
@@ -388,7 +456,17 @@
         pages: 0,
         provider: null,
         buttons: null,
-        
+        preloader: null,
+        preload: {
+            show: function(){
+                if(Paginator.preloader) Paginator.preloader.show();
+                if(Paginator.ul) Paginator.ul.hide();
+            },
+            hide: function(){
+                if(Paginator.preloader) Paginator.preloader.hide();
+                if(Paginator.ul) Paginator.ul.show();
+            }
+        },
         /**
          * Object to create the buttons
          */
@@ -473,6 +551,13 @@
                 //return nums;
                 return {btnNums: nums, pos:medium};
             },
+            
+            /**
+             * This function creates the paging structure.
+             * @param {Number} total total pages the API returns
+             * @param {Number} max máximum number of buttons displayed
+             * @param {Number} current current page
+             */
             generateButtonPositions: function (total, max, current) {
                 var l = max + 2,
                         medium = (function () {
@@ -500,13 +585,16 @@
                 }
             },
             generateButtons: function(container, total, max, current){                
-                var buttonNumbers = this.generateButtonPositions(total, max, parseInt(current, 10)),
+                var 
+                    buttonNumbers = this.generateButtonPositions(total, max, parseInt(current, 10)),
                     txts = buttonNumbers.btnNums,
                     p = buttonNumbers.pos,
                     buttons = [],
                     dots = Paginator.dots,
                     lastPos = txts.length-1,
                     tmpBtn;
+                
+                
                 if(p !== 1){
                     tmp = $("<span>"+txts[0]+"</span>");
                     container.append(tmp);
@@ -551,6 +639,7 @@
          */
         render: function(items){
             var tmpLi;
+            
             if( !$.isArray(items) ) {
                 if($.isArray(this.items)){
                     var items = this.items;
@@ -617,22 +706,25 @@
         },
         goNext: function(){
             if(this.currentPage < this.totalPages){
+                this.preload.show();
                 this.currentPage++;
                 this.provider.provide(this.currentPage);
-                this.paginate();
+                //this.paginate();
             }
         },
         goPrevious: function(){
             if(this.currentPage > 1){
+                this.preload.show();
                 this.currentPage--;
                 this.provider.provide(this.currentPage);
-                this.paginate();
+                //this.paginate();
             }
         },
         goToPage: function(page){
+            this.preload.show();
             this.currentPage = page;
             this.provider.provide(this.currentPage);
-            this.paginate();
+            //this.paginate();
         },
         createPages: function(){
             if( !this.div instanceof $ ) return;
@@ -675,59 +767,99 @@
         
     }
     
-    /**
-     * We add a search button
-     * @param {String} id element after which we add the button
-     * @param {String} idButton 
-     * @returns {htmlELEMENT} dom node of a button
-     */
-    function addButton(id, idButton, className){
-        var wrap = $("#"+id).wrap("<div />").parent(),
-            button = $("<button>Search github repositories</button>").attr("id", idButton);
-        wrap.append(button);
-        wrap.attr("class", className);
-        return button;
+    function addButton(id, legend){
+        return $("<button>"+legend+"</button>").attr("id", id);//Search github repositories
+        
+    }
+    
+    function addCheckbox(id){
+        var html = "<label for='"+id+"'>Save results locally (session storage)? </label>"
+                    +"<input type='checkbox' id='"+id+"' />";
+        return $("<div class='left' />").html(html);
+    }
+    
+    function drawControls(id){
+        var container = $("#"+id).wrap("<div />").parent(),
+            searchBtn = addButton("searchBtn", "Search github repositories"),
+            clearBtn = addButton("clearBtn", "Clear"),
+            checkbox = addCheckbox(GithubRepoApi.cacheControl),
+            preload = $("<div id='preload'><div>loading</div></div>"),
+            className = "content-layout";
+            container.attr("class", className);
+            container.append([searchBtn, clearBtn, checkbox, preload]);            
+            preload.hide();
+        return {searchButton: searchBtn,
+                clearButton: clearBtn,
+                checkbox: checkbox,
+                preload: preload};
     }
     
     /**
      * Start app
      */
     function main(){
-        var layoutClass = "content-layout", //main layout class:
-            button = addButton("search", "searchBtn", layoutClass);
-            apisearcher = new GithubRepoApi.Provider(API_URL);//ApiSearcher(API_URL),
+        var apisearcher = new GithubRepoApi.Provider(API_URL),
             resulDiv = $("#results"),
-            searchInput = $("#search");
+            searchInput = $("#search"),
+            controls = drawControls("search");
          
+         resulDiv.attr("class", "content-layout");
          
-         resulDiv.attr("class", layoutClass)
-         button.on("click", function(){
-             apisearcher.provide({
-                q: searchInput.val(),
-                page: 1
-            });
-         });
          Paginator.provider = apisearcher;
+         Paginator.preloader = controls.preload;
+         
          apisearcher.on(ApiSearcher.SEARCH, function(ev){
              GithubRepoApi.parseResponse(ev);
              Paginator.container = resulDiv;
              Paginator.items = GithubRepoApi.toRepositoryArray();
              Paginator.currentPage = GithubRepoApi.current;
              Paginator.totalPages = GithubRepoApi.last;
-
+             Paginator.preload.hide();
              Paginator.paginate();
              Paginator.render();
+             apisearcher.saveCache();
          });
+         
+         apisearcher.on(ApiSearcher.PROVIDE, function(ob){
+             Paginator.container = resulDiv;
+             Paginator.items = ob.currentItems;
+             Paginator.totalPages = ob.total;
+             Paginator.currentPage = ob.current;
+             Paginator.preload.hide();
+             Paginator.paginate();
+             Paginator.render();
+             
+         })
          
          apisearcher.on(ApiSearcher.ERROR, function(ev){
              alert(ev)
          })
-         searchInput.on("keyup", function (e) {                
-            if (e.keyCode == 13) {          
+         
+         controls.searchButton.on("click", function(){
+             var val = searchInput.val();
+             if(val) {
+                controls.preload.show();
                 apisearcher.provide({
-                    q: searchInput.val(),
+                    q: val,
                     page: 1
-                });               
+                });
+             }
+         });
+         
+         controls.clearButton.on("click", function(){
+             $("#results").empty();
+         });
+         
+         searchInput.on("keyup", function (e) {
+            if (e.keyCode == 13) { 
+                var val = searchInput.val();
+                if(val){
+                    controls.preload.show();
+                    apisearcher.provide({
+                        q: val,
+                        page: 1
+                    });  
+                }             
             }
         });
     }

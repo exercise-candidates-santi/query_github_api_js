@@ -1,6 +1,6 @@
 $buttonColor: #4B6D01;
 $bgcolor:  $buttonColor + #777;
-$buttonHard: $buttonColor - #CCC;
+$buttonHard: $buttonColor - $buttonColor/2;
     
 @mixin border-radius($radius) {
   -webkit-border-radius: $radius;
@@ -27,6 +27,9 @@ li{
     padding: 0;
 }
 
+button {
+    min-width: 8em;
+}
 .content-layout {
     margin: 0 auto;
     width: 40%;
@@ -40,6 +43,8 @@ li{
 
 #results {
     text-align: left;
+    margin-top: 40px;
+    clear: both;
 }
 
 .githubrepo-has-action {
@@ -54,12 +59,24 @@ li{
     .page-list-element {
         margin: 1em 0;
         padding: 1em;
-        border: 3px solid $buttonColor;
+        border: 3px solid $buttonHard;
         @include border-radius(10px);
         ul{
             padding-left: 1em;
             padding-top: 1em;
             border-top: 2px solid $buttonColor;
+        }
+        li {
+            display: table;
+            > span:first-child {
+                display: table-cell;
+                color: $buttonHard;
+                font-weight: bolder;
+                width: 120px;
+            }
+            > span:last-child {
+                display: table-cell;
+            }
         }
     }
     > div {
@@ -92,5 +109,32 @@ li{
             padding: 0.2em;
             width: 85px;
         }
+        span  {
+            background-color: rgb(75, 109, 1);
+            border: 2px solid rgb(0, 0, 0);
+            border-radius: 3px;
+            color: white;
+            padding: 2px;
+            font-weight: bold;
+            margin-bottom: 0.5em;
+            display:inline-block;
+        }
     }
+}
+.left {
+    float: left;
+}
+#preload{
+    position: relative;
+    top: -5px;
+    left: 1em;
+    float: left;
+    background-color: rgb(75, 109, 1);
+    border: 2px solid rgb(0, 0, 0);
+    border-radius: 3px;
+    color: white;
+    padding: 2px;
+    font-weight: bold;
+    margin-bottom: 0.5em;
+    display:inline-block;
 }

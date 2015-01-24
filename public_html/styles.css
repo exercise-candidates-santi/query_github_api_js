@@ -14,6 +14,9 @@ ul {
 li {
   padding: 0; }
 
+button {
+  min-width: 8em; }
+
 .content-layout {
   margin: 0 auto;
   width: 40%; }
@@ -23,17 +26,19 @@ li {
   margin: 1em 1em 1em 0; }
 
 #results {
-  text-align: left; }
+  text-align: left;
+  margin-top: 40px;
+  clear: both; }
 
 .githubrepo-has-action {
   cursor: pointer; }
 
 .paginated .page-selected {
-  background-color: black; }
+  background-color: #263701; }
 .paginated .page-list-element {
   margin: 1em 0;
   padding: 1em;
-  border: 3px solid #4B6D01;
+  border: 3px solid #263701;
   -webkit-border-radius: 10px;
   -moz-border-radius: 10px;
   -ms-border-radius: 10px;
@@ -42,6 +47,15 @@ li {
     padding-left: 1em;
     padding-top: 1em;
     border-top: 2px solid #4B6D01; }
+  .paginated .page-list-element li {
+    display: table; }
+    .paginated .page-list-element li > span:first-child {
+      display: table-cell;
+      color: #263701;
+      font-weight: bolder;
+      width: 120px; }
+    .paginated .page-list-element li > span:last-child {
+      display: table-cell; }
 .paginated > div {
   padding: 1em 0; }
   .paginated > div > span {
@@ -59,14 +73,40 @@ li {
     -ms-border-radius: 4px;
     border-radius: 4px; }
   .paginated > div > span:hover {
-    background-color: black; }
+    background-color: #263701; }
 .paginated .owner em {
   display: inline-block;
   font-style: normal;
   font-weight: bold;
   font-size: 1.1em;
-  color: black;
+  color: #263701;
   padding: 0.2em;
   width: 85px; }
+.paginated .owner span {
+  background-color: #4b6d01;
+  border: 2px solid black;
+  border-radius: 3px;
+  color: white;
+  padding: 2px;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+  display: inline-block; }
+
+.left {
+  float: left; }
+
+#preload {
+  position: relative;
+  top: -5px;
+  left: 1em;
+  float: left;
+  background-color: #4b6d01;
+  border: 2px solid black;
+  border-radius: 3px;
+  color: white;
+  padding: 2px;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+  display: inline-block; }
 
 /*# sourceMappingURL=styles.css.map */
